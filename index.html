@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>安记 · 看清消费</title>
+  <meta name="theme-color" content="#1f9e8a" />
+  <meta name="description" content="非评判式的个人消费理解工具：低摩擦记录，看清钱去哪，连接你真正想要的生活。" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="安记" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ============ 账号（登录/注册）============ -->
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-card">
+      <h1 class="auth-title">安记</h1>
+      <p class="subtle">登录后，你的消费记录会安全地同步到云端，换设备也不丢。</p>
+      <div id="auth-backend-notice" class="auth-notice" hidden></div>
+      <input id="auth-email" class="auth-input" type="email" placeholder="邮箱" autocomplete="email" />
+      <input id="auth-password" class="auth-input" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" />
+      <div id="auth-error" class="auth-error" hidden></div>
+      <button id="auth-primary" class="primary-btn" type="button">登录</button>
+      <button id="auth-toggle" class="auth-link" type="button">还没有账号？注册一个</button>
+      <button id="auth-skip" class="auth-link subtle" type="button">仅本地使用（跳过）</button>
+    </div>
+  </div>
+
+  <div id="app" hidden>
+    <div id="user-bar" class="user-bar" hidden>
+      <span id="user-email" class="user-email"></span>
+      <span id="sync-status" class="sync-status"></span>
+      <button id="user-logout" class="user-logout" type="button">退出</button>
+    </div>
+    <!-- ============ Home ============ -->
+    <section id="view-home" class="view">
+      <header class="app-header">
+        <div class="app-header-row">
+          <div class="app-header-main">
+          <h1>消费都去哪了</h1>
+          <p class="subtle">不打分，不批评，先看看消费去哪。</p>
+          </div>
+          <button id="home-add-goal" class="header-add-btn" type="button">＋目标</button>
+        </div>
+      </header>
+
+      <div class="card" id="home-goal-card" hidden>
+        <div class="card-title" id="home-goal-title">本月目标</div>
+        <div id="home-goal-body"></div>
+      </div>
+
+      <div class="card summary-card">
+        <div class="summary-label">本月支出</div>
+        <div class="summary-amount" id="home-month-total">¥0</div>
+        <div class="summary-delta" id="home-month-delta">—</div>
+      </div>
+
+      <!-- 分类分布 / 近 6 个月 已移至「理解 → 趋势」页，收敛首页长度 -->
+
+      <div class="card">
+        <div class="card-title">最近记录</div>
+        <div id="home-recent" class="recent"></div>
+        <div id="home-recent-empty" class="empty-hint">还没有记录。</div>
+      </div>
+    </section>
+
+    <!-- ============ Quick Log ============ -->
+    <section id="view-log" class="view" hidden>
+      <header class="app-header">
+        <h1>记一笔</h1>
+        <p class="subtle">3–5 秒就好，不用想太多。</p>
+      </header>
+
+      <div class="amount-display">
+        <span class="currency">¥</span>
+        <span id="log-amount">0</span>
+      </div>
+
+      <input id="log-note" class="note-input" type="text" placeholder="备注（可选，用于自动分类，如「外卖」「地铁」）" maxlength="40" />
+
+      <div class="cat-suggest">
+        <span class="cat-suggest-label">自动分类</span>
+        <button id="log-cat" class="cat-chip" type="button">其他</button>
+      </div>
+      <div id="log-cat-list" class="cat-list"></div>
+
+      <div class="keypad" id="log-keypad"></div>
+
+      <button id="log-submit" class="primary-btn" type="button">记好了</button>
+
+      <!-- ============ 我的记录（查找 / 修改 / 删除）============ -->
+      <div class="card records-card">
+        <div class="card-title">我的记录</div>
+        <div class="records-filter">
+          <input id="records-keyword" class="note-input records-keyword" type="text" placeholder="搜索备注或金额" maxlength="40" />
+          <div class="records-filter-row">
+            <select id="records-cat-filter" class="records-select"></select>
+            <input id="records-from" class="records-date" type="date" />
+            <span class="records-date-sep">至</span>
+            <input id="records-to" class="records-date" type="date" />
+          </div>
+        </div>
+        <div id="records-list" class="records-list"></div>
+        <div id="records-empty" class="empty-hint" hidden>没有找到相关记录</div>
+      </div>
+
+      <!-- 编辑弹窗（复用 .modal / .goal-add / .goal-cancel 视觉） -->
+      <div id="edit-modal" class="modal" hidden>
+        <div class="modal-card">
+          <p class="modal-text">编辑这笔记录</p>
+          <input id="edit-amount" class="goal-add-input" type="number" min="0" step="0.01" placeholder="金额" />
+          <input id="edit-note" class="goal-add-input" type="text" placeholder="备注（可选）" maxlength="40" />
+          <div id="edit-cat-list" class="cat-list"></div>
+          <div class="modal-actions">
+            <button id="edit-save" class="goal-add" type="button">保存</button>
+            <button id="edit-cancel" class="goal-cancel" type="button">取消</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 删除确认弹窗（温和中性） -->
+      <div id="confirm-modal" class="modal" hidden>
+        <div class="modal-card">
+          <p id="confirm-text" class="modal-text">确定要移除这笔记录吗？</p>
+          <div class="modal-actions">
+            <button id="confirm-remove" class="goal-add" type="button">移除</button>
+            <button id="confirm-cancel" class="goal-cancel" type="button">取消</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 撤销 toast（独立 5s 窗口，不复用 #toast） -->
+      <div id="undo-toast" class="toast undo-toast" hidden>
+        <span class="undo-toast-text"></span>
+        <button class="undo-toast-btn" type="button">撤销</button>
+      </div>
+    </section>
+
+    <!-- ============ Insight ============ -->
+    <section id="view-insight" class="view" hidden>
+      <header class="app-header">
+        <h1>理解消费</h1>
+        <p class="subtle">看清怎么花，为什么花，下一步由你决定。</p>
+      </header>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="trend" type="button">趋势</button>
+        <button class="tab" data-tab="why" type="button">复盘</button>
+        <button class="tab" data-tab="review" type="button">轻回顾</button>
+        <button class="tab" data-tab="goal" type="button">目标</button>
+      </div>
+
+      <div id="tab-trend" class="tab-panel">
+        <div class="card">
+          <div class="card-title">本月分类</div>
+          <div id="insight-cat-bars" class="bars"></div>
+          <div id="insight-cat-empty" class="empty-hint">还没有记录。</div>
+        </div>
+        <div class="card">
+          <div class="card-title">与上月对比</div>
+          <div id="insight-mom" class="mom"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">近 6 个月</div>
+          <div id="insight-trend" class="trend"></div>
+        </div>
+      </div>
+
+      <div id="tab-why" class="tab-panel" hidden>
+        <div class="card">
+          <div class="card-title">本月消费复盘</div>
+          <p class="subtle small">安记先把本月的消费整理好了——下面是已经聚合后的群组，不是几十笔流水。你觉得这些消费主要意味着什么？</p>
+          <div id="agg-groups"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">值得关注的变化</div>
+          <div id="agg-notable"></div>
+          <div id="agg-notable-empty" class="empty-hint">这个月没有特别跳动的消费方向。</div>
+        </div>
+        <div class="card">
+          <div class="card-title">我的关注规则（可校正）</div>
+          <p class="subtle small">你来决定什么变化值得被提醒。安记只整理，不替你判断。</p>
+          <div id="agg-rules"></div>
+          <div id="agg-rule-form" class="rule-form"></div>
+        </div>
+      </div>
+
+      <div id="tab-review" class="tab-panel" hidden>
+        <div class="card review-card">
+          <div class="card-title">一句话理解</div>
+          <p id="review-text" class="review-text">记录几笔后，这里会生成一句非评判式的理解。</p>
+        </div>
+      </div>
+
+      <div id="tab-goal" class="tab-panel" hidden>
+        <div id="goal-review-body"></div>
+      </div>
+    </section>
+
+    <!-- ============ Bottom Nav ============ -->
+    <nav class="bottom-nav">
+      <button class="nav-btn" data-view="home" type="button">
+        <span class="nav-icon">⊞</span><span>消费</span>
+      </button>
+      <button class="nav-btn nav-log" data-view="log" type="button">
+        <span class="nav-icon nav-icon-plus">＋</span><span>记一笔</span>
+      </button>
+      <button class="nav-btn" data-view="insight" type="button">
+        <span class="nav-icon">◑</span><span>理解</span>
+      </button>
+    </nav>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <!-- 测试数据导出面板：仅在 URL 含 ?debug=1 时显示，普通用户无感 -->
+    <div id="debug-panel" hidden>
+      <div class="debug-head">
+        <span class="debug-title">测试数据导出（debug）</span>
+        <span class="debug-note">仅含交互事件，不含金额/备注</span>
+        <span class="debug-actions">
+          <button id="debug-refresh" type="button">刷新</button>
+          <button id="debug-copy" type="button">复制</button>
+          <button id="debug-download" type="button">下载</button>
+          <button id="debug-clear" type="button">清空</button>
+        </span>
+      </div>
+      <textarea id="debug-summary" class="debug-summary" readonly placeholder="汇总将显示在这里"></textarea>
+      <textarea id="debug-text" class="debug-text" readonly placeholder="事件 JSON 将显示在这里"></textarea>
+    </div>
+
+    <!-- 月末温和调整弹窗 -->
+    <div id="goal-modal" class="modal" hidden>
+      <div class="modal-card">
+        <p id="goal-modal-text" class="modal-text"></p>
+        <div class="modal-actions">
+          <button id="modal-keep" class="goal-add" type="button">保持目标</button>
+          <button id="modal-up" class="goal-cancel" type="button">提高目标</button>
+          <button id="modal-down" class="goal-cancel" type="button">降低目标</button>
+          <button id="modal-none" class="goal-cancel" type="button">暂不设置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="cloud.js"></script>
+  <script src="localdb.js"></script>
+  <script src="app.js"></script>
+  <script>
+    // 注册 service worker，使应用可离线打开、可“添加到主屏幕”作为 App 使用
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function () { /* 注册失败不影响正常使用 */ });
+      });
+    }
+  </script>
+</body>
+</html>

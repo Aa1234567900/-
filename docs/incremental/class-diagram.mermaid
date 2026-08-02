@@ -1,0 +1,47 @@
+classDiagram
+    class Transaction {
+        +String id
+        +Number amount
+        +String note
+        +String category
+        +Number createdAt
+        +Number updatedAt
+        +String whyTag
+        +String goalId
+    }
+    class AppState {
+        +Transaction[] txns
+        +recordsFilter{keyword,catKey,from,to}
+        +editId
+        +editCatKey
+    }
+    class RecordsModule {
+        +queryTxns(filter) Transaction[]
+        +renderRecords() void
+        +beginEdit(id) void
+        +buildEditCatList() void
+        +saveEdit() void
+        +deleteTxn(id) Transaction
+        +confirmDelete(id) void
+        +undoDelete(copy) void
+        -showUndoToast(msg,onUndo) void
+    }
+    class SaveFlow {
+        +save() void
+    }
+    class LocalDB {
+        <<unchanged>>
+        +getAllTxns()
+        +putTxns(items)
+    }
+    class Cloud {
+        <<unchanged>>
+        +pushTxns(items)
+        +isLoggedIn()
+    }
+    RecordsModule ..> AppState : 读写 state.txns
+    RecordsModule ..> SaveFlow : 调用 save()
+    SaveFlow ..> LocalDB : putTxns(state.txns)
+    SaveFlow ..> Cloud : pushTxns(state.txns)
+    RecordsModule ..> Cloud : pushTxns([tombstone])
+    RecordsModule ..> Transaction : 过滤/克隆

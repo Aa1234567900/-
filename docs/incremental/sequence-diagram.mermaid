@@ -1,0 +1,53 @@
+sequenceDiagram
+    actor U as 用户
+    participant V as #view-log(我的记录)
+    participant A as app.js(RecordsModule)
+    participant S as state.txns
+    participant L as LocalDB
+    participant C as Cloud
+    participant SV as server /api/txns/sync
+
+    Note over U,SV: === 4.1 编辑保存 ===
+    U->>V: 点击某行「编辑」
+    V->>A: beginEdit(id)
+    A->>S: find txn by id
+    A->>V: 填充 #edit-amount/#edit-note + buildEditCatList()，显示 #edit-modal
+    U->>V: 改字段 + 选分类 + 点「保存」
+    V->>A: saveEdit()
+    A->>S: t.amount=amt; t.note=note; t.category=editCatKey; t.updatedAt=now()
+    A->>A: save()
+    A->>L: putTxns(state.txns)
+    alt 登录态
+        A->>C: pushTxns(state.txns)
+        C-->>A: ok / fail(仅提示)
+    end
+    A->>V: 关闭 #edit-modal, renderRecords(), toast('已更新')
+
+    Note over U,SV: === 4.2 删除 + 云端推送（路线 B） ===
+    U->>V: 点击某行「删除」
+    V->>A: (行按钮) 显 #confirm-modal(温和中性)
+    U->>V: 确认「移除」
+    V->>A: confirmDelete(id)
+    A->>S: copy=clone(txn); state.txns=filter(!=id)
+    A->>A: save()
+    A->>L: putTxns(state.txns)
+    alt 登录态
+        A->>C: pushTxns(state.txns)
+        A->>C: pushTxns([{id,_deleted:true,updatedAt:now}])
+        C->>SV: POST /api/txns/sync(items=[tombstone])
+        SV-->>C: {ok}
+    end
+    A->>V: renderRecords()
+    A->>V: showUndoToast('已删除', undoDelete)
+
+    Note over U,SV: === 4.3 撤销 ===
+    U->>V: 5s 内点 #undo-toast「撤销」
+    V->>A: undoDelete(copy)
+    A->>S: state.txns.push(copy)
+    A->>A: save()
+    A->>L: putTxns(state.txns)
+    alt 登录态
+        A->>C: pushTxns(state.txns)
+    end
+    A->>V: renderRecords(), toast('已恢复')
+    Note over A,V: 若 tombstone 仍在途且后到, 下次 save()/pull() 自愈(最终一致)
